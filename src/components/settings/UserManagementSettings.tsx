@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Plus, Shield, Trash2, X, UserPlus } from "lucide-react";
+import { Loader2, Trash2, X, UserPlus, Link, Unlink } from "lucide-react";
 import { motion } from "framer-motion";
 import { z } from "zod";
 
@@ -12,12 +12,15 @@ const ROLES = [
   { value: "user", label: "Support Worker", desc: "Day-to-day operations" },
 ];
 
+type StaffRecord = { id: string; first_name: string; last_name: string; preferred_name?: string | null; email: string };
+
 type UserRecord = {
   id: string;
   email: string;
   display_name: string;
   role: string;
   staff_id: string | null;
+  staff_name: string | null;
   created_at: string;
 };
 
@@ -44,14 +47,18 @@ async function callManageUsers(action: string, body: Record<string, unknown> = {
 export function UserManagementSettings() {
   const queryClient = useQueryClient();
   const [showInvite, setShowInvite] = useState(false);
+  const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const data = await callManageUsers("list");
-      return data.users as UserRecord[];
+      const result = await callManageUsers("list");
+      return result as { users: UserRecord[]; unlinked_staff: StaffRecord[] };
     },
   });
+
+  const users = data?.users || [];
+  const unlinkedStaff = data?.unlinked_staff || [];
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ user_id, role }: { user_id: string; role: string }) => {
@@ -60,6 +67,19 @@ export function UserManagementSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast.success("Role updated");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const linkStaffMutation = useMutation({
+    mutationFn: async ({ user_id, staff_id }: { user_id: string; staff_id: string | null }) => {
+      await callManageUsers("link_staff", { user_id, staff_id });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      setLinkingUserId(null);
+      toast.success("Staff link updated");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -76,7 +96,7 @@ export function UserManagementSettings() {
   });
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{users.length} users</p>
         <button
@@ -114,6 +134,7 @@ export function UserManagementSettings() {
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">User</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Role</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Linked Staff</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground w-20">Actions</th>
                 </tr>
               </thead>
@@ -140,6 +161,58 @@ export function UserManagementSettings() {
                           <option key={r.value} value={r.value}>{r.label}</option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      {linkingUserId === u.id ? (
+                        <div className="flex items-center gap-2">
+                          <select
+                            defaultValue={u.staff_id || ""}
+                            onChange={(e) => {
+                              linkStaffMutation.mutate({ user_id: u.id, staff_id: e.target.value || null });
+                            }}
+                            disabled={linkStaffMutation.isPending}
+                            className="h-8 rounded-lg border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          >
+                            <option value="">— None —</option>
+                            {/* Show currently linked staff as an option too */}
+                            {u.staff_id && u.staff_name && (
+                              <option value={u.staff_id}>{u.staff_name} (current)</option>
+                            )}
+                            {unlinkedStaff.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.first_name} {s.last_name} ({s.email})
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => setLinkingUserId(null)}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : u.staff_name ? (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                            <Link className="h-3 w-3" />
+                            {u.staff_name}
+                          </span>
+                          <button
+                            onClick={() => setLinkingUserId(u.id)}
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            title="Change linked staff"
+                          >
+                            <Unlink className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setLinkingUserId(u.id)}
+                          className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                        >
+                          <Link className="h-3 w-3" /> Link staff profile
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -291,7 +364,7 @@ function InviteUserDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
               onChange={(e) => update("staff_id", e.target.value)}
               className="w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">None (create later)</option>
+              <option value="">None (link later)</option>
               {staffList.map((s: any) => (
                 <option key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.email})</option>
               ))}
