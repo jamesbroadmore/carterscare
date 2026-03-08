@@ -1,32 +1,14 @@
 import { AppLayout } from "@/components/AppLayout";
-import { ChevronLeft, ChevronRight, Loader2, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfWeek, endOfWeek, addWeeks, addDays, parseISO } from "date-fns";
-import { toast } from "sonner";
+import { format, startOfWeek, endOfWeek, addWeeks, addDays } from "date-fns";
+import { NewRosterDialog } from "@/components/roster/NewRosterDialog";
 
 const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const hours = Array.from({ length: 14 }, (_, i) => i + 6); // 6am–7pm
-
-interface RosterForm {
-  staffId: string;
-  clientId: string;
-  date: string;
-  startHour: string;
-  endHour: string;
-  notes: string;
-}
-
-const emptyForm = (date: string, hour: number): RosterForm => ({
-  staffId: "",
-  clientId: "",
-  date,
-  startHour: `${String(hour).padStart(2, "0")}:00`,
-  endHour: `${String(Math.min(hour + 2, 20)).padStart(2, "0")}:00`,
-  notes: "",
-});
+const hours = Array.from({ length: 14 }, (_, i) => i + 6);
 
 export default function Roster() {
   const queryClient = useQueryClient();
