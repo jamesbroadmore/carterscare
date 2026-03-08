@@ -18,6 +18,7 @@ import Financials from "./pages/Financials";
 import Reports from "./pages/Reports";
 import SettingsPage from "./pages/SettingsPage";
 import Onboarding from "./pages/Onboarding";
+import MyCompliance from "./pages/MyCompliance";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="/timesheets" element={<ProtectedRoute><Timesheets /></ProtectedRoute>} />
             <Route path="/case-notes" element={<ProtectedRoute><CaseNotes /></ProtectedRoute>} />
             <Route path="/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
+            <Route path="/my-compliance" element={<ProtectedRoute><MyCompliance /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
