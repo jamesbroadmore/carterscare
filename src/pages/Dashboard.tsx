@@ -5,8 +5,35 @@ import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+
+  const { data: greeting } = useQuery({
+    queryKey: ["dashboard-greeting", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      // Get profile → staff link to find preferred_name
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name, staff_id")
+        .eq("user_id", user!.id)
+        .single();
+
+      if (profile?.staff_id) {
+        const { data: staff } = await supabase
+          .from("staff")
+          .select("preferred_name, first_name")
+          .eq("id", profile.staff_id)
+          .single();
+        if (staff?.preferred_name) return staff.preferred_name;
+        if (staff?.first_name) return staff.first_name;
+      }
+
+      return profile?.display_name || user!.email?.split("@")[0] || "there";
+    },
+  });
   const { data: staffCount = 0 } = useQuery({
     queryKey: ["dashboard-staff-count"],
     queryFn: async () => {
@@ -67,6 +94,14 @@ export default function Dashboard() {
   return (
     <AppLayout title="Dashboard">
       <div className="space-y-6">
+        <motion.h2
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-xl font-semibold text-foreground"
+        >
+          Hello, {greeting ?? "..."}
+        </motion.h2>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {metrics.map((m, i) => (
             <MetricCard key={i} {...m} />
