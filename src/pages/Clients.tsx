@@ -169,13 +169,15 @@ export default function Clients() {
                       {(c as any).preferred_name && <p className="text-xs text-muted-foreground mt-0.5">"{(c as any).preferred_name}"</p>}
                       {c.ndis_number && <p className="text-xs text-muted-foreground mt-0.5">NDIS: {c.ndis_number}</p>}
                     </div>
-                    <ClientActionMenu
-                      open={menuOpen === c.id}
-                      onToggle={() => setMenuOpen(menuOpen === c.id ? null : c.id)}
-                      onClose={() => setMenuOpen(null)}
-                      onEdit={() => { setEditClient(c); setMenuOpen(null); }}
-                      onDelete={() => handleDelete(c)}
-                    />
+                    {isAdmin && (
+                      <ClientActionMenu
+                        open={menuOpen === c.id}
+                        onToggle={() => setMenuOpen(menuOpen === c.id ? null : c.id)}
+                        onClose={() => setMenuOpen(null)}
+                        onEdit={() => { setEditClient(c); setMenuOpen(null); }}
+                        onDelete={() => handleDelete(c)}
+                      />
+                    )}
                   </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="text-card-foreground font-medium capitalize">{c.status}</span></div>
