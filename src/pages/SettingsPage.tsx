@@ -29,9 +29,12 @@ const CONTENT: Record<Exclude<SettingsSection, "main">, React.FC> = {
 
 export default function SettingsPage() {
   const [active, setActive] = useState<SettingsSection>("main");
+  const { isAdmin } = useAuth();
+
+  const sections = isAdmin ? allSections : allSections.filter((s) => !s.adminOnly);
 
   if (active !== "main") {
-    const section = sections.find((s) => s.key === active)!;
+    const section = allSections.find((s) => s.key === active)!;
     const Content = CONTENT[active];
     return (
       <AppLayout title={section.title}>
