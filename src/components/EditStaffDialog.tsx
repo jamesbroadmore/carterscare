@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, KeyRound, Eye, EyeOff, ShieldCheck, ShieldX, UserPlus } from "lucide-react";
 import { z } from "zod";
 
 const staffSchema = z.object({
@@ -38,6 +38,7 @@ interface StaffRecord {
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
   notes?: string | null;
+  user_id?: string | null;
 }
 
 interface EditStaffDialogProps {
@@ -54,6 +55,33 @@ export function EditStaffDialog({ open, onClose, staff }: EditStaffDialogProps) 
     start_date: "", address: "", emergency_contact_name: "", emergency_contact_phone: "", notes: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // User access state
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [newSystemRole, setNewSystemRole] = useState<string>("user");
+
+  // Fetch linked user info
+  const { data: linkedUser, isLoading: loadingUser } = useQuery({
+    queryKey: ["staff-user", staff?.id],
+    queryFn: async () => {
+      if (!staff?.user_id) return null;
+      // Get role from user_roles
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", staff.user_id)
+        .single();
+      return {
+        user_id: staff.user_id,
+        role: roleData?.role || "user",
+      };
+    },
+    enabled: !!staff && open,
+  });
+
+  const hasAccount = !!staff?.user_id;
 
   useEffect(() => {
     if (staff) {
@@ -73,8 +101,16 @@ export function EditStaffDialog({ open, onClose, staff }: EditStaffDialogProps) 
         notes: staff.notes || "",
       });
       setErrors({});
+      setShowCreateAccount(false);
+      setNewPassword("");
+      setNewSystemRole(linkedUser?.role || "user");
     }
   }, [staff]);
+
+  // Update newSystemRole when linkedUser loads
+  useEffect(() => {
+    if (linkedUser?.role) setNewSystemRole(linkedUser.role);
+  }, [linkedUser]);
 
   const mutation = useMutation({
     mutationFn: async (data: StaffForm) => {
@@ -101,6 +137,54 @@ export function EditStaffDialog({ open, onClose, staff }: EditStaffDialogProps) 
       queryClient.invalidateQueries({ queryKey: ["staff"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-staff-count"] });
       onClose();
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // Create account mutation
+  const createAccountMutation = useMutation({
+    mutationFn: async () => {
+      if (!staff || !newPassword) return;
+      const { data: result, error } = await supabase.functions.invoke("manage-users", {
+        body: {
+          action: "invite",
+          email: staff.email,
+          password: newPassword,
+          display_name: `${staff.first_name} ${staff.last_name}`,
+          role: newSystemRole,
+          staff_id: staff.id,
+        },
+      });
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success("Login account created!");
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      queryClient.invalidateQueries({ queryKey: ["staff-user", staff?.id] });
+      setShowCreateAccount(false);
+      setNewPassword("");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // Update role mutation
+  const updateRoleMutation = useMutation({
+    mutationFn: async (role: string) => {
+      if (!staff?.user_id) return;
+      const { data: result, error } = await supabase.functions.invoke("manage-users", {
+        body: {
+          action: "update_role",
+          user_id: staff.user_id,
+          role,
+        },
+      });
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success("System role updated!");
+      queryClient.invalidateQueries({ queryKey: ["staff-user", staff?.id] });
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -180,6 +264,112 @@ export function EditStaffDialog({ open, onClose, staff }: EditStaffDialogProps) 
               rows={2}
               className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
+          </div>
+
+          {/* User Access Section */}
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <KeyRound className="h-4 w-4 text-primary" />
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System Access</p>
+            </div>
+
+            {loadingUser ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking account...
+              </div>
+            ) : hasAccount ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <ShieldCheck className="h-4 w-4 text-success" />
+                  <span className="text-card-foreground">Login account linked</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <SelectField
+                    label="System Role"
+                    value={newSystemRole}
+                    onChange={(v) => setNewSystemRole(v)}
+                    options={[
+                      { value: "user", label: "User (Staff)" },
+                      { value: "moderator", label: "Moderator" },
+                      { value: "admin", label: "Admin" },
+                    ]}
+                  />
+                  {newSystemRole !== linkedUser?.role && (
+                    <button
+                      type="button"
+                      onClick={() => updateRoleMutation.mutate(newSystemRole)}
+                      disabled={updateRoleMutation.isPending}
+                      className="mt-5 h-9 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {updateRoleMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Update
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <ShieldX className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">No login account</span>
+                </div>
+
+                {!showCreateAccount ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateAccount(true)}
+                    className="h-8 px-3 rounded-lg border text-xs font-medium text-foreground hover:bg-secondary transition-colors flex items-center gap-1.5"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" /> Create Login Account
+                  </button>
+                ) : (
+                  <div className="space-y-3 rounded-lg border border-border bg-secondary/30 p-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Password *</label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Min 8 characters"
+                          className="w-full h-9 rounded-lg border bg-background px-3 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <SelectField label="System Role" value={newSystemRole} onChange={(v) => setNewSystemRole(v)} options={[
+                      { value: "user", label: "User (Staff)" },
+                      { value: "moderator", label: "Moderator" },
+                      { value: "admin", label: "Admin" },
+                    ]} />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => createAccountMutation.mutate()}
+                        disabled={createAccountMutation.isPending || newPassword.length < 8}
+                        className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {createAccountMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        Create Account
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowCreateAccount(false); setNewPassword(""); }}
+                        className="h-8 px-3 rounded-lg border text-xs font-medium text-foreground hover:bg-secondary transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
