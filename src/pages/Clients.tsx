@@ -41,6 +41,26 @@ export default function Clients() {
     },
   });
 
+  const { data: assignments = [] } = useQuery({
+    queryKey: ["client-staff-assignments"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_staff_assignments")
+        .select("client_id, staff_id, staff:staff_id(id, first_name, last_name)");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const assignmentsByClient = useMemo(() => {
+    const map: Record<string, { id: string; first_name: string; last_name: string }[]> = {};
+    assignments.forEach((a: any) => {
+      if (!map[a.client_id]) map[a.client_id] = [];
+      if (a.staff) map[a.client_id].push(a.staff);
+    });
+    return map;
+  }, [assignments]);
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("clients").delete().eq("id", id);
