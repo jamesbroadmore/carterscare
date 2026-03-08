@@ -11,9 +11,8 @@ const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const hours = Array.from({ length: 14 }, (_, i) => i + 6);
 
 export default function Roster() {
-  const queryClient = useQueryClient();
   const [weekOffset, setWeekOffset] = useState(0);
-  const [rosterForm, setRosterForm] = useState<RosterForm | null>(null);
+  const [rosterDialog, setRosterDialog] = useState<{ date: string; hour: number } | null>(null);
 
   const currentWeekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
   const currentWeekEnd = endOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
@@ -63,42 +62,9 @@ export default function Roster() {
     },
   });
 
-  const mutation = useMutation({
-    mutationFn: async (form: RosterForm) => {
-      const shiftDate = form.date;
-      const startTime = `${shiftDate}T${form.startHour}:00`;
-      const endTime = `${shiftDate}T${form.endHour}:00`;
-      const { error } = await supabase.from("timesheets").insert({
-        staff_id: form.staffId,
-        client_id: form.clientId || null,
-        shift_date: shiftDate,
-        start_time: startTime,
-        end_time: endTime,
-        notes: form.notes || null,
-        status: "pending",
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Roster entry created!");
-      queryClient.invalidateQueries({ queryKey: ["roster-timesheets"] });
-      setRosterForm(null);
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
   const handleCellClick = (dayIndex: number, hour: number) => {
     const date = format(weekDates[dayIndex], "yyyy-MM-dd");
-    setRosterForm(emptyForm(date, hour));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rosterForm?.staffId) {
-      toast.error("Please select a staff member");
-      return;
-    }
-    mutation.mutate(rosterForm);
+    setRosterDialog({ date, hour });
   };
 
   // Map timesheets to grid positions
@@ -137,7 +103,7 @@ export default function Roster() {
             )}
           </div>
           <button
-            onClick={() => setRosterForm(emptyForm(format(new Date(), "yyyy-MM-dd"), new Date().getHours()))}
+            onClick={() => setRosterDialog({ date: format(new Date(), "yyyy-MM-dd"), hour: new Date().getHours() })}
             className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-opacity"
           >
             <Plus className="h-4 w-4" /> New Roster
@@ -202,109 +168,14 @@ export default function Roster() {
         </motion.div>
       </div>
 
-      {/* New Roster Dialog */}
-      {rosterForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setRosterForm(null)}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-xl bg-card shadow-xl border border-border"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-5 border-b">
-              <h2 className="text-lg font-semibold text-card-foreground">New Roster Entry</h2>
-              <button onClick={() => setRosterForm(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              {/* Date */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Date</label>
-                <input
-                  type="date"
-                  value={rosterForm.date}
-                  onChange={(e) => setRosterForm({ ...rosterForm, date: e.target.value })}
-                  className="w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              {/* Time */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Start Time</label>
-                  <input
-                    type="time"
-                    value={rosterForm.startHour}
-                    onChange={(e) => setRosterForm({ ...rosterForm, startHour: e.target.value })}
-                    className="w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">End Time</label>
-                  <input
-                    type="time"
-                    value={rosterForm.endHour}
-                    onChange={(e) => setRosterForm({ ...rosterForm, endHour: e.target.value })}
-                    className="w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-              </div>
-
-              {/* Staff */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Staff Member *</label>
-                <select
-                  value={rosterForm.staffId}
-                  onChange={(e) => setRosterForm({ ...rosterForm, staffId: e.target.value })}
-                  className="w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">Select staff...</option>
-                  {staffList.map((s) => (
-                    <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Client */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Client</label>
-                <select
-                  value={rosterForm.clientId}
-                  onChange={(e) => setRosterForm({ ...rosterForm, clientId: e.target.value })}
-                  className="w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">Select client (optional)...</option>
-                  {clientList.map((c) => (
-                    <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Notes</label>
-                <textarea
-                  value={rosterForm.notes}
-                  onChange={(e) => setRosterForm({ ...rosterForm, notes: e.target.value })}
-                  placeholder="Any shift notes..."
-                  rows={2}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setRosterForm(null)} className="h-9 px-4 rounded-lg border text-sm font-medium text-foreground hover:bg-secondary transition-colors">
-                  Cancel
-                </button>
-                <button type="submit" disabled={mutation.isPending} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50">
-                  {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Create Roster
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
+      <NewRosterDialog
+        open={!!rosterDialog}
+        onClose={() => setRosterDialog(null)}
+        defaultDate={rosterDialog?.date ?? format(new Date(), "yyyy-MM-dd")}
+        defaultHour={rosterDialog?.hour ?? 8}
+        staffList={staffList}
+        clientList={clientList}
+      />
     </AppLayout>
   );
 }
