@@ -7,17 +7,17 @@ import { Navigate } from "react-router-dom";
 import cartersLogo from "@/assets/Carters-Logo.png";
 
 export default function Login() {
-  const { signIn, signUp, session, loading } = useAuth();
+  const { signIn, signUp, session, loading: authLoading } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
-
-  // Redirect if already authenticated
-  if (!loading && session) {
-    return <Navigate to="/" replace />;
-  }
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Redirect if already authenticated
+  if (!authLoading && session) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
