@@ -51,6 +51,7 @@ export default function Clients() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="text-sm font-semibold text-card-foreground">{c.first_name} {c.last_name}</h3>
+                    {(c as any).preferred_name && <p className="text-xs text-muted-foreground mt-0.5">"{(c as any).preferred_name}"</p>}
                     {c.ndis_number && <p className="text-xs text-muted-foreground mt-0.5">NDIS: {c.ndis_number}</p>}
                   </div>
                   <button className="text-muted-foreground hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></button>

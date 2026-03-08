@@ -7,7 +7,8 @@ import { z } from "zod";
 
 const clientSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required").max(100),
-  last_name: z.string().trim().min(1, "Last name is required").max(100),
+  last_name: z.string().trim().min(1, "Surname is required").max(100),
+  preferred_name: z.string().trim().max(100).optional(),
   email: z.string().trim().email("Invalid email").max(255).optional().or(z.literal("")),
   phone: z.string().trim().max(20).optional(),
   date_of_birth: z.string().optional(),
@@ -29,6 +30,7 @@ type ClientForm = z.infer<typeof clientSchema>;
 const emptyForm: ClientForm = {
   first_name: "",
   last_name: "",
+  preferred_name: "",
   email: "",
   phone: "",
   date_of_birth: "",
@@ -60,6 +62,7 @@ export function AddClientDialog({ open, onClose }: AddClientDialogProps) {
       const { error } = await supabase.from("clients").insert({
         first_name: data.first_name,
         last_name: data.last_name,
+        preferred_name: data.preferred_name || null,
         email: data.email || null,
         phone: data.phone || null,
         date_of_birth: data.date_of_birth || null,
@@ -121,9 +124,10 @@ export function AddClientDialog({ open, onClose }: AddClientDialogProps) {
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {/* Personal Details */}
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personal Details</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Field label="First Name *" value={form.first_name} onChange={(v) => update("first_name", v)} error={errors.first_name} placeholder="Maria" />
-            <Field label="Last Name *" value={form.last_name} onChange={(v) => update("last_name", v)} error={errors.last_name} placeholder="Torres" />
+            <Field label="Surname *" value={form.last_name} onChange={(v) => update("last_name", v)} error={errors.last_name} placeholder="Torres" />
+            <Field label="Preferred Name" value={form.preferred_name || ""} onChange={(v) => update("preferred_name", v)} placeholder="Ria" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Email" value={form.email || ""} onChange={(v) => update("email", v)} error={errors.email} placeholder="maria@example.com" type="email" />
