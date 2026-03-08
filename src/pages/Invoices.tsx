@@ -90,6 +90,13 @@ export default function Invoices() {
         </div>
 
         <CreateInvoiceDialog open={showCreate} onClose={() => setShowCreate(false)} />
+        {editInvoice && (
+          <EditInvoiceDialog
+            open={!!editInvoice}
+            onClose={() => setEditInvoice(null)}
+            invoiceId={editInvoice.id}
+          />
+        )}
         {viewInvoice && (
           <ViewInvoiceDialog
             open={!!viewInvoice}
