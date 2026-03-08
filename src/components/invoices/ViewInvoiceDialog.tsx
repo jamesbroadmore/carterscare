@@ -135,8 +135,8 @@ export function ViewInvoiceDialog({ open, onClose, invoiceId, isAdmin, onStatusC
           {orgMap.company_name && (
             <div className="rounded-lg bg-secondary/50 p-3 text-xs">
               <p className="font-medium text-card-foreground">Bill To: {orgMap.company_name}</p>
-              {orgMap.company_abn && <p className="text-muted-foreground">ABN: {orgMap.company_abn}</p>}
-              {orgMap.company_address && <p className="text-muted-foreground">{orgMap.company_address}</p>}
+              {orgMap.abn && <p className="text-muted-foreground">ABN: {orgMap.abn}</p>}
+              {orgMap.address && <p className="text-muted-foreground">{orgMap.address}</p>}
             </div>
           )}
 
