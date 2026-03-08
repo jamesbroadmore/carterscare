@@ -44,7 +44,9 @@ export default function Staff() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-secondary/50">
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">First Name</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Surname</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Preferred Name</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Role</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Type</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Email</th>
