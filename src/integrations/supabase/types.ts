@@ -83,6 +83,7 @@ export type Database = {
           ndis_plan_start: string | null
           notes: string | null
           phone: string | null
+          preferred_name: string | null
           primary_disability: string | null
           status: string
           support_needs: string | null
@@ -105,6 +106,7 @@ export type Database = {
           ndis_plan_start?: string | null
           notes?: string | null
           phone?: string | null
+          preferred_name?: string | null
           primary_disability?: string | null
           status?: string
           support_needs?: string | null
@@ -127,6 +129,7 @@ export type Database = {
           ndis_plan_start?: string | null
           notes?: string | null
           phone?: string | null
+          preferred_name?: string | null
           primary_disability?: string | null
           status?: string
           support_needs?: string | null

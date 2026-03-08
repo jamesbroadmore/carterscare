@@ -124,9 +124,10 @@ export function AddClientDialog({ open, onClose }: AddClientDialogProps) {
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {/* Personal Details */}
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personal Details</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Field label="First Name *" value={form.first_name} onChange={(v) => update("first_name", v)} error={errors.first_name} placeholder="Maria" />
-            <Field label="Last Name *" value={form.last_name} onChange={(v) => update("last_name", v)} error={errors.last_name} placeholder="Torres" />
+            <Field label="Surname *" value={form.last_name} onChange={(v) => update("last_name", v)} error={errors.last_name} placeholder="Torres" />
+            <Field label="Preferred Name" value={form.preferred_name || ""} onChange={(v) => update("preferred_name", v)} placeholder="Ria" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Email" value={form.email || ""} onChange={(v) => update("email", v)} error={errors.email} placeholder="maria@example.com" type="email" />
