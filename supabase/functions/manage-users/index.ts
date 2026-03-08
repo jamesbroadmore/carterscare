@@ -86,13 +86,11 @@ Deno.serve(async (req) => {
 
       // Link staff record if provided
       if (staff_id) {
-        // Update the profile (created by trigger) with staff_id
         await adminClient
           .from("profiles")
           .update({ staff_id })
           .eq("user_id", newUser.user.id);
 
-        // Also link user_id on staff record
         await adminClient
           .from("staff")
           .update({ user_id: newUser.user.id })
@@ -112,16 +110,66 @@ Deno.serve(async (req) => {
       const { data: roles } = await adminClient.from("user_roles").select("*");
       const { data: profiles } = await adminClient.from("profiles").select("user_id, staff_id, display_name");
 
-      const enriched = users.users.map((u) => ({
-        id: u.id,
-        email: u.email,
-        display_name: u.user_metadata?.display_name || u.email,
-        created_at: u.created_at,
-        role: roles?.find((r) => r.user_id === u.id)?.role || "user",
-        staff_id: profiles?.find((p) => p.user_id === u.id)?.staff_id || null,
-      }));
+      // Get staff records for display
+      const { data: staffRecords } = await adminClient.from("staff").select("id, first_name, last_name, preferred_name, email");
 
-      return new Response(JSON.stringify({ users: enriched }), {
+      const enriched = users.users.map((u) => {
+        const profile = profiles?.find((p) => p.user_id === u.id);
+        const staffId = profile?.staff_id || null;
+        const staff = staffId ? staffRecords?.find((s) => s.id === staffId) : null;
+        return {
+          id: u.id,
+          email: u.email,
+          display_name: u.user_metadata?.display_name || u.email,
+          created_at: u.created_at,
+          role: roles?.find((r) => r.user_id === u.id)?.role || "user",
+          staff_id: staffId,
+          staff_name: staff ? `${staff.first_name} ${staff.last_name}` : null,
+        };
+      });
+
+      // Also return unlinked staff for the linking dropdown
+      const linkedStaffIds = new Set(enriched.map((u) => u.staff_id).filter(Boolean));
+      const unlinkedStaff = (staffRecords || []).filter((s) => !linkedStaffIds.has(s.id));
+
+      return new Response(JSON.stringify({ users: enriched, unlinked_staff: unlinkedStaff }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "link_staff") {
+      const { user_id, staff_id } = body;
+      if (!user_id) {
+        return new Response(JSON.stringify({ error: "Missing user_id" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Unlink previous staff if any
+      const { data: currentProfile } = await adminClient
+        .from("profiles")
+        .select("staff_id")
+        .eq("user_id", user_id)
+        .single();
+
+      if (currentProfile?.staff_id) {
+        await adminClient.from("staff").update({ user_id: null }).eq("id", currentProfile.staff_id);
+      }
+
+      // Update profile with new staff_id (or null to unlink)
+      await adminClient.from("profiles").update({ staff_id: staff_id || null }).eq("user_id", user_id);
+
+      // Link new staff record
+      if (staff_id) {
+        // Clear any other user linked to this staff
+        await adminClient.from("staff").update({ user_id: null }).eq("user_id", user_id);
+        await adminClient.from("staff").update({ user_id }).eq("id", staff_id);
+      } else {
+        await adminClient.from("staff").update({ user_id: null }).eq("user_id", user_id);
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -135,7 +183,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Upsert role
       const { data: existing } = await adminClient
         .from("user_roles")
         .select("id")
@@ -162,7 +209,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Don't allow deleting yourself
       if (user_id === caller.id) {
         return new Response(JSON.stringify({ error: "Cannot delete your own account" }), {
           status: 400,
