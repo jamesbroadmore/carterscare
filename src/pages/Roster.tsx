@@ -146,8 +146,11 @@ export default function Roster() {
                             {shifts.map((s: any) => (
                               <div
                                 key={s.id}
-                                className="rounded-md bg-primary/10 border border-primary/20 px-1.5 py-1 mb-0.5 text-[10px] leading-tight"
-                                onClick={(e) => e.stopPropagation()}
+                                className="rounded-md bg-primary/10 border border-primary/20 px-1.5 py-1 mb-0.5 text-[10px] leading-tight cursor-pointer hover:bg-primary/20 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedShift(s);
+                                }}
                               >
                                 <p className="font-semibold text-primary truncate">
                                   {s.staff?.first_name} {s.staff?.last_name?.[0]}.
