@@ -42,6 +42,7 @@ const navItems = [
   { title: "Compliance", url: "/compliance", icon: ShieldCheck },
   { title: "Financials", url: "/financials", icon: DollarSign },
   { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Onboarding", url: "/onboarding", icon: GraduationCap },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
