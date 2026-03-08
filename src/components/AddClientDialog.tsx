@@ -16,7 +16,7 @@ const clientSchema = z.object({
   ndis_number: z.string().trim().max(20).optional(),
   ndis_plan_start: z.string().optional(),
   ndis_plan_end: z.string().optional(),
-  funding_type: z.enum(["ndis", "home_care", "private", "other"]).optional(),
+  funding_type: z.enum(["ndis", "aged_care", "chsp", "hvp", "home_care", "private", "other"]).optional(),
   primary_disability: z.string().trim().max(200).optional(),
   support_needs: z.string().trim().max(2000).optional(),
   emergency_contact_name: z.string().trim().max(100).optional(),
@@ -56,6 +56,9 @@ export function AddClientDialog({ open, onClose }: AddClientDialogProps) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<ClientForm>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const isNDIS = form.funding_type === "ndis";
+  const isAgedCare = ["aged_care", "chsp", "hvp", "home_care"].includes(form.funding_type || "");
 
   const mutation = useMutation({
     mutationFn: async (data: ClientForm) => {
@@ -122,8 +125,20 @@ export function AddClientDialog({ open, onClose }: AddClientDialogProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Funding type first — drives conditional fields */}
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Client Type</p>
+          <SelectField label="Funding Type" value={form.funding_type || "ndis"} onChange={(v) => update("funding_type", v)} options={[
+            { value: "ndis", label: "NDIS" },
+            { value: "aged_care", label: "Aged Care (HCP)" },
+            { value: "chsp", label: "CHSP" },
+            { value: "hvp", label: "Home & Veterans" },
+            { value: "home_care", label: "Home Care Package" },
+            { value: "private", label: "Private" },
+            { value: "other", label: "Other" },
+          ]} />
+
           {/* Personal Details */}
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personal Details</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-2">Personal Details</p>
           <div className="grid grid-cols-3 gap-3">
             <Field label="First Name *" value={form.first_name} onChange={(v) => update("first_name", v)} error={errors.first_name} placeholder="Maria" />
             <Field label="Surname *" value={form.last_name} onChange={(v) => update("last_name", v)} error={errors.last_name} placeholder="Torres" />
@@ -138,30 +153,38 @@ export function AddClientDialog({ open, onClose }: AddClientDialogProps) {
             <Field label="Address" value={form.address || ""} onChange={(v) => update("address", v)} placeholder="123 Main St" />
           </div>
 
-          {/* NDIS Details */}
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-2">NDIS & Funding</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="NDIS Number" value={form.ndis_number || ""} onChange={(v) => update("ndis_number", v)} placeholder="431 234 567" />
-            <SelectField label="Funding Type" value={form.funding_type || "ndis"} onChange={(v) => update("funding_type", v)} options={[
-              { value: "ndis", label: "NDIS" },
-              { value: "home_care", label: "Home Care" },
-              { value: "private", label: "Private" },
-              { value: "other", label: "Other" },
-            ]} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Plan Start" value={form.ndis_plan_start || ""} onChange={(v) => update("ndis_plan_start", v)} type="date" />
-            <Field label="Plan End" value={form.ndis_plan_end || ""} onChange={(v) => update("ndis_plan_end", v)} type="date" />
-          </div>
+          {/* NDIS-specific fields */}
+          {isNDIS && (
+            <>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-2">NDIS Details</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="NDIS Number" value={form.ndis_number || ""} onChange={(v) => update("ndis_number", v)} placeholder="431 234 567" />
+                <Field label="Primary Disability" value={form.primary_disability || ""} onChange={(v) => update("primary_disability", v)} placeholder="e.g. Intellectual Disability" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Plan Start" value={form.ndis_plan_start || ""} onChange={(v) => update("ndis_plan_start", v)} type="date" />
+                <Field label="Plan End" value={form.ndis_plan_end || ""} onChange={(v) => update("ndis_plan_end", v)} type="date" />
+              </div>
+            </>
+          )}
 
-          <Field label="Primary Disability" value={form.primary_disability || ""} onChange={(v) => update("primary_disability", v)} placeholder="e.g. Intellectual Disability" />
+          {/* Aged Care fields */}
+          {isAgedCare && (
+            <>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-2">Aged Care Details</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Plan Start" value={form.ndis_plan_start || ""} onChange={(v) => update("ndis_plan_start", v)} type="date" />
+                <Field label="Plan End" value={form.ndis_plan_end || ""} onChange={(v) => update("ndis_plan_end", v)} type="date" />
+              </div>
+            </>
+          )}
 
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Support Needs</label>
             <textarea
               value={form.support_needs || ""}
               onChange={(e) => update("support_needs", e.target.value)}
-              placeholder="Describe support requirements..."
+              placeholder={isAgedCare ? "Describe care requirements..." : "Describe support requirements..."}
               rows={2}
               className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
@@ -172,7 +195,7 @@ export function AddClientDialog({ open, onClose }: AddClientDialogProps) {
           <div className="grid grid-cols-3 gap-3">
             <Field label="Name" value={form.emergency_contact_name || ""} onChange={(v) => update("emergency_contact_name", v)} placeholder="John Torres" />
             <Field label="Phone" value={form.emergency_contact_phone || ""} onChange={(v) => update("emergency_contact_phone", v)} placeholder="0412 345 678" />
-            <Field label="Relationship" value={form.emergency_contact_relationship || ""} onChange={(v) => update("emergency_contact_relationship", v)} placeholder="Father" />
+            <Field label="Relationship" value={form.emergency_contact_relationship || ""} onChange={(v) => update("emergency_contact_relationship", v)} placeholder="Son" />
           </div>
 
           <div>
