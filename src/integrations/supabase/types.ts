@@ -383,6 +383,7 @@ export type Database = {
           last_name: string
           notes: string | null
           phone: string | null
+          preferred_name: string | null
           qualifications: string[] | null
           role: string
           start_date: string | null
@@ -403,6 +404,7 @@ export type Database = {
           last_name: string
           notes?: string | null
           phone?: string | null
+          preferred_name?: string | null
           qualifications?: string[] | null
           role?: string
           start_date?: string | null
@@ -423,6 +425,7 @@ export type Database = {
           last_name?: string
           notes?: string | null
           phone?: string | null
+          preferred_name?: string | null
           qualifications?: string[] | null
           role?: string
           start_date?: string | null
