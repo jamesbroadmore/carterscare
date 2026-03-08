@@ -7,7 +7,8 @@ import { z } from "zod";
 
 const staffSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required").max(100),
-  last_name: z.string().trim().min(1, "Last name is required").max(100),
+  last_name: z.string().trim().min(1, "Surname is required").max(100),
+  preferred_name: z.string().trim().max(100).optional(),
   email: z.string().trim().email("Invalid email address").max(255),
   phone: z.string().trim().max(20).optional(),
   role: z.enum(["support_worker", "team_leader", "coordinator", "admin"]),
@@ -24,6 +25,7 @@ type StaffForm = z.infer<typeof staffSchema>;
 const emptyForm: StaffForm = {
   first_name: "",
   last_name: "",
+  preferred_name: "",
   email: "",
   phone: "",
   role: "support_worker",
@@ -50,6 +52,7 @@ export function AddStaffDialog({ open, onClose }: AddStaffDialogProps) {
       const { error } = await supabase.from("staff").insert({
         first_name: data.first_name,
         last_name: data.last_name,
+        preferred_name: data.preferred_name || null,
         email: data.email,
         phone: data.phone || null,
         role: data.role,
@@ -104,9 +107,10 @@ export function AddStaffDialog({ open, onClose }: AddStaffDialogProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Field label="First Name *" value={form.first_name} onChange={(v) => update("first_name", v)} error={errors.first_name} placeholder="Sarah" />
-            <Field label="Last Name *" value={form.last_name} onChange={(v) => update("last_name", v)} error={errors.last_name} placeholder="Mitchell" />
+            <Field label="Surname *" value={form.last_name} onChange={(v) => update("last_name", v)} error={errors.last_name} placeholder="Mitchell" />
+            <Field label="Preferred Name" value={form.preferred_name || ""} onChange={(v) => update("preferred_name", v)} placeholder="Saz" />
           </div>
 
           <Field label="Email *" value={form.email} onChange={(v) => update("email", v)} error={errors.email} placeholder="sarah@example.com" type="email" />
