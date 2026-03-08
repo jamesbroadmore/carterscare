@@ -14,6 +14,7 @@ const hours = Array.from({ length: 14 }, (_, i) => i + 6);
 export default function Roster() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [rosterDialog, setRosterDialog] = useState<{ date: string; hour: number } | null>(null);
+  const [selectedShift, setSelectedShift] = useState<any>(null);
 
   const currentWeekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
   const currentWeekEnd = endOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
