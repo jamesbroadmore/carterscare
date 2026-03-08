@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AddClientDialog } from "@/components/AddClientDialog";
 import { EditClientDialog } from "@/components/EditClientDialog";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const TABS = [
   { key: "all", label: "All Clients" },
@@ -23,6 +24,7 @@ function getFundingCategory(fundingType: string | null): string {
 }
 
 export default function Clients() {
+  const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [editClient, setEditClient] = useState<any>(null);
@@ -118,9 +120,11 @@ export default function Clients() {
               placeholder="Search clients..."
             />
           </div>
-          <button onClick={() => setShowAdd(true)} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <Plus className="h-4 w-4" /> Add Client
-          </button>
+          {isAdmin && (
+            <button onClick={() => setShowAdd(true)} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-opacity">
+              <Plus className="h-4 w-4" /> Add Client
+            </button>
+          )}
         </div>
 
         <AddClientDialog open={showAdd} onClose={() => setShowAdd(false)} />
@@ -165,13 +169,15 @@ export default function Clients() {
                       {(c as any).preferred_name && <p className="text-xs text-muted-foreground mt-0.5">"{(c as any).preferred_name}"</p>}
                       {c.ndis_number && <p className="text-xs text-muted-foreground mt-0.5">NDIS: {c.ndis_number}</p>}
                     </div>
-                    <ClientActionMenu
-                      open={menuOpen === c.id}
-                      onToggle={() => setMenuOpen(menuOpen === c.id ? null : c.id)}
-                      onClose={() => setMenuOpen(null)}
-                      onEdit={() => { setEditClient(c); setMenuOpen(null); }}
-                      onDelete={() => handleDelete(c)}
-                    />
+                    {isAdmin && (
+                      <ClientActionMenu
+                        open={menuOpen === c.id}
+                        onToggle={() => setMenuOpen(menuOpen === c.id ? null : c.id)}
+                        onClose={() => setMenuOpen(null)}
+                        onEdit={() => { setEditClient(c); setMenuOpen(null); }}
+                        onDelete={() => handleDelete(c)}
+                      />
+                    )}
                   </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="text-card-foreground font-medium capitalize">{c.status}</span></div>
