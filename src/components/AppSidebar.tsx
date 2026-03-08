@@ -12,6 +12,7 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  GraduationCap,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -41,6 +42,7 @@ const navItems = [
   { title: "Compliance", url: "/compliance", icon: ShieldCheck },
   { title: "Financials", url: "/financials", icon: DollarSign },
   { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Onboarding", url: "/onboarding", icon: GraduationCap },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
