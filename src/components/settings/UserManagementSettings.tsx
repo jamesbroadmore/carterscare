@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Trash2, X, UserPlus, Link, Unlink } from "lucide-react";
+import { Loader2, Trash2, X, UserPlus, Link, Unlink, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
 import { z } from "zod";
 
@@ -47,6 +47,7 @@ async function callManageUsers(action: string, body: Record<string, unknown> = {
 export function UserManagementSettings() {
   const queryClient = useQueryClient();
   const [showInvite, setShowInvite] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -117,6 +118,17 @@ export function UserManagementSettings() {
         />
       )}
 
+      {editingUser && (
+        <EditUserDialog
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSuccess={() => {
+            setEditingUser(null);
+            queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+          }}
+        />
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -135,7 +147,7 @@ export function UserManagementSettings() {
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Role</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Linked Staff</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground w-20">Actions</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground w-24">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,7 +186,6 @@ export function UserManagementSettings() {
                             className="h-8 rounded-lg border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           >
                             <option value="">— None —</option>
-                            {/* Show currently linked staff as an option too */}
                             {u.staff_id && u.staff_name && (
                               <option value={u.staff_id}>{u.staff_name} (current)</option>
                             )}
@@ -215,18 +226,27 @@ export function UserManagementSettings() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => {
-                          if (confirm(`Remove ${u.display_name}? This cannot be undone.`)) {
-                            deleteMutation.mutate(u.id);
-                          }
-                        }}
-                        disabled={deleteMutation.isPending}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                        title="Remove user"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setEditingUser(u)}
+                          className="text-muted-foreground hover:text-primary transition-colors"
+                          title="Edit user details"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove ${u.display_name}? This cannot be undone.`)) {
+                              deleteMutation.mutate(u.id);
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                          title="Remove user"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -238,6 +258,8 @@ export function UserManagementSettings() {
     </div>
   );
 }
+
+/* ─── Invite (Add) User Dialog ─── */
 
 const inviteSchema = z.object({
   email: z.string().trim().email("Invalid email").max(255),
@@ -381,6 +403,131 @@ function InviteUserDialog({ onClose, onSuccess }: { onClose: () => void; onSucce
             >
               {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Create User
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ─── Edit User Dialog ─── */
+
+const editSchema = z.object({
+  display_name: z.string().trim().min(1, "Name is required").max(100),
+  email: z.string().trim().email("Invalid email").max(255),
+  password: z.union([z.literal(""), z.string().min(6, "Minimum 6 characters").max(128)]),
+});
+
+function EditUserDialog({ user, onClose, onSuccess }: { user: UserRecord; onClose: () => void; onSuccess: () => void }) {
+  const [form, setForm] = useState({
+    display_name: user.display_name || "",
+    email: user.email || "",
+    password: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const result = editSchema.safeParse(form);
+      if (!result.success) {
+        const fieldErrors: Record<string, string> = {};
+        result.error.errors.forEach((err) => {
+          if (err.path[0]) fieldErrors[err.path[0] as string] = err.message;
+        });
+        setErrors(fieldErrors);
+        throw new Error("Validation failed");
+      }
+      setErrors({});
+
+      const payload: Record<string, unknown> = { user_id: user.id };
+      if (result.data.display_name !== user.display_name) payload.display_name = result.data.display_name;
+      if (result.data.email !== user.email) payload.email = result.data.email;
+      if (result.data.password) payload.password = result.data.password;
+
+      if (Object.keys(payload).length <= 1) {
+        throw new Error("No changes to save");
+      }
+
+      await callManageUsers("update_user", payload);
+    },
+    onSuccess: () => {
+      toast.success("User details updated");
+      onSuccess();
+    },
+    onError: (err: Error) => {
+      if (err.message !== "Validation failed") toast.error(err.message);
+    },
+  });
+
+  const update = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md rounded-xl bg-card shadow-xl border border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="text-lg font-semibold text-card-foreground">Edit User</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="p-5 space-y-4">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Display Name *</label>
+            <input
+              type="text"
+              value={form.display_name}
+              onChange={(e) => update("display_name", e.target.value)}
+              placeholder="Charlie Loveland"
+              maxLength={100}
+              className={`w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring ${errors.display_name ? "border-destructive" : ""}`}
+            />
+            {errors.display_name && <p className="text-xs text-destructive mt-1">{errors.display_name}</p>}
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Email *</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => update("email", e.target.value)}
+              placeholder="charlie@carterscaregroup.com.au"
+              maxLength={255}
+              className={`w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring ${errors.email ? "border-destructive" : ""}`}
+            />
+            {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">New Password</label>
+            <input
+              type="password"
+              value={form.password}
+              onChange={(e) => update("password", e.target.value)}
+              placeholder="Leave blank to keep current"
+              maxLength={128}
+              className={`w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring ${errors.password ? "border-destructive" : ""}`}
+            />
+            {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
+            <p className="text-[10px] text-muted-foreground mt-1">Leave blank to keep the current password</p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} className="h-9 px-4 rounded-lg border text-sm font-medium text-foreground hover:bg-secondary transition-colors">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save Changes
             </button>
           </div>
         </form>

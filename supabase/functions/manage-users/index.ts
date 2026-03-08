@@ -200,6 +200,55 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "update_user") {
+      const { user_id, email, password, display_name } = body;
+      if (!user_id) {
+        return new Response(JSON.stringify({ error: "Missing user_id" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const updates: Record<string, unknown> = {};
+      if (email && typeof email === "string") updates.email = email.trim().slice(0, 255);
+      if (password && typeof password === "string") {
+        if (password.length < 6) {
+          return new Response(JSON.stringify({ error: "Password must be at least 6 characters" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        updates.password = password.slice(0, 128);
+      }
+      if (display_name && typeof display_name === "string") {
+        updates.user_metadata = { display_name: display_name.trim().slice(0, 100) };
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return new Response(JSON.stringify({ error: "No fields to update" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(user_id, updates);
+      if (updateError) {
+        return new Response(JSON.stringify({ error: updateError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Update display_name in profiles too
+      if (display_name) {
+        await adminClient.from("profiles").update({ display_name: display_name.trim().slice(0, 100) }).eq("user_id", user_id);
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "delete") {
       const { user_id } = body;
       if (!user_id) {
