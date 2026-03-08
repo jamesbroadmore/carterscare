@@ -7,7 +7,8 @@ import { z } from "zod";
 
 const staffSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required").max(100),
-  last_name: z.string().trim().min(1, "Last name is required").max(100),
+  last_name: z.string().trim().min(1, "Surname is required").max(100),
+  preferred_name: z.string().trim().max(100).optional(),
   email: z.string().trim().email("Invalid email address").max(255),
   phone: z.string().trim().max(20).optional(),
   role: z.enum(["support_worker", "team_leader", "coordinator", "admin"]),
