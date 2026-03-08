@@ -48,7 +48,7 @@ export function ViewInvoiceDialog({ open, onClose, invoiceId, isAdmin, onStatusC
       const { data, error } = await supabase
         .from("organisation_settings")
         .select("key, value")
-        .in("key", ["company_name", "company_abn", "company_address"]);
+        .in("key", ["company_name", "abn", "address"]);
       if (error) throw error;
       return data;
     },
