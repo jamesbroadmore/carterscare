@@ -11,6 +11,7 @@ import Clients from "./pages/Clients";
 import Roster from "./pages/Roster";
 import ShiftCheckIn from "./pages/ShiftCheckIn";
 import Timesheets from "./pages/Timesheets";
+import Invoices from "./pages/Invoices";
 import CaseNotes from "./pages/CaseNotes";
 import Incidents from "./pages/Incidents";
 import Compliance from "./pages/Compliance";
