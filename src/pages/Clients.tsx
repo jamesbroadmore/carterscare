@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AddClientDialog } from "@/components/AddClientDialog";
 import { EditClientDialog } from "@/components/EditClientDialog";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const TABS = [
   { key: "all", label: "All Clients" },
