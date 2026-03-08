@@ -62,6 +62,7 @@ export function AddClientDialog({ open, onClose }: AddClientDialogProps) {
       const { error } = await supabase.from("clients").insert({
         first_name: data.first_name,
         last_name: data.last_name,
+        preferred_name: data.preferred_name || null,
         email: data.email || null,
         phone: data.phone || null,
         date_of_birth: data.date_of_birth || null,
