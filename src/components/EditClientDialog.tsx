@@ -36,9 +36,66 @@ interface EditClientDialogProps {
 }
 
 export function EditClientDialog({ open, onClose, client }: EditClientDialogProps) {
+  const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<ClientForm>({} as ClientForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [staffToAssign, setStaffToAssign] = useState("");
+
+  // Fetch all staff for assignment dropdown
+  const { data: allStaff = [] } = useQuery({
+    queryKey: ["staff-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("staff").select("id, first_name, last_name").eq("status", "active").order("first_name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: open && isAdmin,
+  });
+
+  // Fetch current assignments for this client
+  const { data: currentAssignments = [] } = useQuery({
+    queryKey: ["client-assignments", client?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_staff_assignments")
+        .select("id, staff_id, staff:staff_id(id, first_name, last_name)")
+        .eq("client_id", client.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: open && !!client?.id,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async (staffId: string) => {
+      const { error } = await supabase.from("client_staff_assignments").insert({ client_id: client.id, staff_id: staffId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-assignments", client?.id] });
+      queryClient.invalidateQueries({ queryKey: ["client-staff-assignments"] });
+      setStaffToAssign("");
+      toast.success("Staff assigned");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const unassignMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const { error } = await supabase.from("client_staff_assignments").delete().eq("id", assignmentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-assignments", client?.id] });
+      queryClient.invalidateQueries({ queryKey: ["client-staff-assignments"] });
+      toast.success("Staff unassigned");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const assignedStaffIds = currentAssignments.map((a: any) => a.staff_id);
+  const availableStaff = allStaff.filter((s) => !assignedStaffIds.includes(s.id));
 
   useEffect(() => {
     if (client) {
