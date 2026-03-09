@@ -102,7 +102,7 @@ export default function Staff() {
                   </tr>
                 </thead>
                 <tbody>
-                  {staffData.map((s) => (
+                  {filteredStaff.map((s) => (
                     <tr
                       key={s.id}
                       className="border-b last:border-0 hover:bg-secondary/30 transition-colors"
