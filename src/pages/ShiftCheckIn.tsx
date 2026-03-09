@@ -380,9 +380,9 @@ export default function ShiftCheckIn() {
                           )}
                         </p>
                         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                          <span>{format(new Date(checkin.check_in_time!), "MMM d, h:mm a")}</span>
+                          <span>{formatPerthTime(checkin.check_in_time!)}</span>
                           {checkin.check_out_time && (
-                            <span>→ {format(new Date(checkin.check_out_time), "h:mm a")}</span>
+                            <span>→ {formatPerthTime(checkin.check_out_time)}</span>
                           )}
                           {checkin.check_in_lat && (
                             <span className="flex items-center gap-0.5">
