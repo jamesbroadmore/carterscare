@@ -13,6 +13,7 @@ export default function Staff() {
   const [showAdd, setShowAdd] = useState(false);
   const [editStaff, setEditStaff] = useState<any>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const { data: staffData = [], isLoading } = useQuery({
     queryKey: ["staff"],
