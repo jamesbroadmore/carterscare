@@ -251,7 +251,7 @@ export default function ShiftCheckIn() {
                 <div>
                   <p className="text-lg font-semibold text-card-foreground">Currently Clocked In</p>
                   <p className="text-sm text-muted-foreground">
-                    {activeCheckin.staff_name} · Since {format(new Date(activeCheckin.check_in_time!), "h:mm a")}
+                    {activeCheckin.staff_name} · Since {formatPerthTime(activeCheckin.check_in_time!)}
                   </p>
                 </div>
               </div>
