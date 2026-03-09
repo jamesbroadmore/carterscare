@@ -94,7 +94,7 @@ export default function ShiftCheckIn() {
   const { data: todayCheckins = [], isLoading } = useQuery({
     queryKey: ["shift-checkins-today"],
     queryFn: async () => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getPerthDate();
       const { data, error } = await supabase
         .from("shift_checkins")
         .select("*")
