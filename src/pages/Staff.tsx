@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Plus, Search, CheckCircle, XCircle, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
