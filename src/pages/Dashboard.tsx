@@ -101,7 +101,7 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="text-xl font-semibold text-foreground"
         >
-          {getTimeGreeting()}, {greeting ?? "..."}
+          {getPerthGreeting()}, {greeting ?? "..."}
         </motion.h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
