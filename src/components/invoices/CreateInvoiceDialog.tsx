@@ -4,8 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { runBillingValidations, saveValidationResults, hasBlockingFailures, type ValidationResult } from "@/lib/billing-validation";
+import { BillingValidationPanel } from "@/components/invoices/BillingValidationPanel";
 
 interface Props {
   open: boolean;
@@ -19,8 +21,10 @@ export function CreateInvoiceDialog({ open, onClose }: Props) {
   const [selectedTimesheets, setSelectedTimesheets] = useState<Set<string>>(new Set());
   const [rate, setRate] = useState("38");
   const [notes, setNotes] = useState("");
+  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationRun, setValidationRun] = useState(false);
 
-  // Get the staff record for current user
   const { data: profile } = useQuery({
     queryKey: ["my-profile", user?.id],
     queryFn: async () => {
@@ -35,11 +39,9 @@ export function CreateInvoiceDialog({ open, onClose }: Props) {
     enabled: !!user?.id,
   });
 
-  // Get approved timesheets that haven't been invoiced yet
   const { data: timesheets = [], isLoading } = useQuery({
     queryKey: ["uninvoiced-timesheets", profile?.staff_id],
     queryFn: async () => {
-      // Get timesheet IDs already on invoices
       const { data: existingItems } = await supabase
         .from("invoice_line_items")
         .select("timesheet_id");
@@ -74,6 +76,9 @@ export function CreateInvoiceDialog({ open, onClose }: Props) {
       else next.add(id);
       return next;
     });
+    // Reset validation when selection changes
+    setValidationRun(false);
+    setValidationResults([]);
   };
 
   const selectAll = () => {
@@ -82,7 +87,29 @@ export function CreateInvoiceDialog({ open, onClose }: Props) {
     } else {
       setSelectedTimesheets(new Set(timesheets.map((t: any) => t.id)));
     }
+    setValidationRun(false);
+    setValidationResults([]);
   };
+
+  const handleValidate = async () => {
+    if (!profile?.staff_id || selectedItems.length === 0) return;
+    setIsValidating(true);
+    try {
+      const results = await runBillingValidations(
+        Array.from(selectedTimesheets),
+        profile.staff_id,
+        rateNum
+      );
+      setValidationResults(results);
+      setValidationRun(true);
+    } catch (err) {
+      toast.error("Validation failed");
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const hasBlockers = hasBlockingFailures(validationResults);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -126,6 +153,11 @@ export function CreateInvoiceDialog({ open, onClose }: Props) {
 
       const { error: liError } = await supabase.from("invoice_line_items").insert(lineItems);
       if (liError) throw liError;
+
+      // Save validation audit trail
+      if (validationResults.length > 0) {
+        await saveValidationResults(validationResults, invoice.id, Array.from(selectedTimesheets));
+      }
     },
     onSuccess: () => {
       toast.success("Invoice created");
@@ -133,6 +165,8 @@ export function CreateInvoiceDialog({ open, onClose }: Props) {
       queryClient.invalidateQueries({ queryKey: ["uninvoiced-timesheets"] });
       setSelectedTimesheets(new Set());
       setNotes("");
+      setValidationResults([]);
+      setValidationRun(false);
       onClose();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -160,7 +194,7 @@ export function CreateInvoiceDialog({ open, onClose }: Props) {
               <label className="text-xs font-medium text-muted-foreground">Hourly Rate ($)</label>
               <input
                 value={rate}
-                onChange={(e) => setRate(e.target.value)}
+                onChange={(e) => { setRate(e.target.value); setValidationRun(false); setValidationResults([]); }}
                 type="number"
                 min="0"
                 step="0.01"
@@ -251,14 +285,37 @@ export function CreateInvoiceDialog({ open, onClose }: Props) {
             </div>
           )}
 
-          <button
-            onClick={() => createMutation.mutate()}
-            disabled={selectedItems.length === 0 || createMutation.isPending}
-            className="w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Create Invoice ({selectedItems.length} items)
-          </button>
+          {/* Compliance Validation Panel */}
+          <BillingValidationPanel results={validationResults} isRunning={isValidating} />
+
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            {!validationRun ? (
+              <button
+                onClick={handleValidate}
+                disabled={selectedItems.length === 0 || isValidating}
+                className="flex-1 h-10 rounded-lg bg-secondary text-card-foreground text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+                Run Compliance Check
+              </button>
+            ) : (
+              <button
+                onClick={() => createMutation.mutate()}
+                disabled={selectedItems.length === 0 || createMutation.isPending || hasBlockers}
+                className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {hasBlockers ? "Billing Blocked — Fix Issues Above" : `Create Invoice (${selectedItems.length} items)`}
+              </button>
+            )}
+          </div>
+
+          {hasBlockers && validationRun && (
+            <p className="text-xs text-destructive text-center">
+              One or more compliance checks failed. Resolve the issues above before creating this invoice.
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>
