@@ -202,6 +202,25 @@ export function ViewInvoiceDialog({ open, onClose, invoiceId, isAdmin, onStatusC
               <span className="font-medium text-card-foreground">Notes: </span>{invoice.notes}
             </div>
           )}
+
+          {/* Compliance audit trail */}
+          {validations.length > 0 && (
+            <div className="rounded-lg border border-border p-3 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-semibold text-card-foreground">Compliance Audit Trail</span>
+              </div>
+              <div className="space-y-1">
+                {validations.map((v: any) => (
+                  <div key={v.id} className={`flex items-center gap-1.5 text-[10px] ${v.passed ? "text-success" : "text-destructive"}`}>
+                    {v.passed ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                    <span className="font-medium capitalize">{v.validation_type.replace(/_/g, " ")}:</span>
+                    <span className="opacity-80">{v.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
