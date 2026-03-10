@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, X, UserPlus, X as XIcon } from "lucide-react";
 import { z } from "zod";
 import { useAuth } from "@/contexts/AuthContext";
+import { ClientFundingPanel } from "@/components/compliance/ClientFundingPanel";
 
 const clientSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required").max(100),
@@ -273,6 +274,14 @@ export function EditClientDialog({ open, onClose, client }: EditClientDialogProp
               className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
           </div>
+
+          {/* Funding & Compliance */}
+          {isAdmin && client?.id && (
+            <>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-2">Funding & Compliance</p>
+              <ClientFundingPanel clientId={client.id} clientName={`${form.first_name} ${form.last_name}`} />
+            </>
+          )}
 
           {/* Assigned Staff Section */}
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-2">Assigned Staff</p>

@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { Loader2, Download, Printer } from "lucide-react";
+import { Loader2, Download, Printer, Shield, CheckCircle, XCircle } from "lucide-react";
 import { useRef } from "react";
 
 interface Props {
@@ -37,6 +37,19 @@ export function ViewInvoiceDialog({ open, onClose, invoiceId, isAdmin, onStatusC
         .select("*, client:client_id(first_name, last_name)")
         .eq("invoice_id", invoiceId)
         .order("service_date");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: validations = [] } = useQuery({
+    queryKey: ["billing-validations", invoiceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("billing_validations")
+        .select("*")
+        .eq("invoice_id", invoiceId)
+        .order("created_at");
       if (error) throw error;
       return data;
     },
@@ -187,6 +200,25 @@ export function ViewInvoiceDialog({ open, onClose, invoiceId, isAdmin, onStatusC
           {invoice.notes && (
             <div className="rounded-lg bg-secondary/50 p-3 text-xs text-muted-foreground">
               <span className="font-medium text-card-foreground">Notes: </span>{invoice.notes}
+            </div>
+          )}
+
+          {/* Compliance audit trail */}
+          {validations.length > 0 && (
+            <div className="rounded-lg border border-border p-3 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-semibold text-card-foreground">Compliance Audit Trail</span>
+              </div>
+              <div className="space-y-1">
+                {validations.map((v: any) => (
+                  <div key={v.id} className={`flex items-center gap-1.5 text-[10px] ${v.passed ? "text-success" : "text-destructive"}`}>
+                    {v.passed ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                    <span className="font-medium capitalize">{v.validation_type.replace(/_/g, " ")}:</span>
+                    <span className="opacity-80">{v.message}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
