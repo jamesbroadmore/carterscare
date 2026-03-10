@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, X, UserPlus, X as XIcon } from "lucide-react";
 import { z } from "zod";
 import { useAuth } from "@/contexts/AuthContext";
+import { ClientFundingPanel } from "@/components/compliance/ClientFundingPanel";
 
 const clientSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required").max(100),
