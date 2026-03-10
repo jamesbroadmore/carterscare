@@ -42,6 +42,19 @@ export function ViewInvoiceDialog({ open, onClose, invoiceId, isAdmin, onStatusC
     },
   });
 
+  const { data: validations = [] } = useQuery({
+    queryKey: ["billing-validations", invoiceId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("billing_validations")
+        .select("*")
+        .eq("invoice_id", invoiceId)
+        .order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: orgSettings = [] } = useQuery({
     queryKey: ["org-settings-invoice"],
     queryFn: async () => {
