@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { Loader2, Download, Printer } from "lucide-react";
+import { Loader2, Download, Printer, Shield, CheckCircle, XCircle } from "lucide-react";
 import { useRef } from "react";
 
 interface Props {
