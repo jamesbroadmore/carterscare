@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { fullName } from "@/lib/display-names";
 
 const CATEGORIES = [
   { value: "general", label: "General" },
@@ -26,7 +27,7 @@ export default function CaseNotes() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("case_notes")
-        .select("*, staff:staff_id(first_name, last_name), client:client_id(first_name, last_name)")
+        .select("*, staff:staff_id(first_name, last_name, preferred_name), client:client_id(first_name, last_name, preferred_name)")
         .order("note_date", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -66,10 +67,10 @@ export default function CaseNotes() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-card-foreground">
-                      {n.client ? `${n.client.first_name} ${n.client.last_name}` : "Unknown Client"}
+                      {fullName(n.client)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {n.staff ? `${n.staff.first_name} ${n.staff.last_name}` : "Unknown"} · {format(new Date(n.note_date), "MMM d, yyyy")}
+                      {fullName(n.staff)} · {format(new Date(n.note_date), "MMM d, yyyy")}
                       {n.category && ` · ${n.category}`}
                     </p>
                     <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{n.content}</p>
@@ -101,7 +102,7 @@ function AddCaseNoteDialog({ onClose }: { onClose: () => void }) {
   const { data: clientList = [] } = useQuery({
     queryKey: ["client-list-notes"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clients").select("id, first_name, last_name").eq("status", "active").order("first_name");
+      const { data, error } = await supabase.from("clients").select("id, first_name, last_name, preferred_name").eq("status", "active").order("first_name");
       if (error) throw error;
       return data;
     },
@@ -150,7 +151,11 @@ function AddCaseNoteDialog({ onClose }: { onClose: () => void }) {
             <select value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })}
               className="w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">Select client...</option>
-              {clientList.map((c: any) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
+              {clientList.map((c: any) => (
+                <option key={c.id} value={c.id}>
+                  {c.preferred_name ? `${c.preferred_name} ${c.last_name}` : `${c.first_name} ${c.last_name}`}
+                </option>
+              ))}
             </select>
           </div>
           <div>

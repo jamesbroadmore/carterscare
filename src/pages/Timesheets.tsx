@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { formatPerthDate, formatPerthTime, extractPerthTime } from "@/lib/perth-time";
 import { TimesheetDetailDialog } from "@/components/timesheets/TimesheetDetailDialog";
+import { fullName } from "@/lib/display-names";
 
 export default function Timesheets() {
   const [selectedTimesheet, setSelectedTimesheet] = useState<any>(null);
@@ -16,7 +17,7 @@ export default function Timesheets() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("timesheets")
-        .select("*, staff:staff_id(first_name, last_name), client:client_id(first_name, last_name)")
+        .select("*, staff:staff_id(first_name, last_name, preferred_name), client:client_id(first_name, last_name, preferred_name)")
         .order("shift_date", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -31,8 +32,8 @@ export default function Timesheets() {
     }
     const headers = ["Staff", "Client", "Date", "Start (AWST)", "End (AWST)", "Hours", "Break (min)", "Status"];
     const rows = timesheets.map((t: any) => [
-      t.staff ? `${t.staff.first_name} ${t.staff.last_name}` : "",
-      t.client ? `${t.client.first_name} ${t.client.last_name}` : "",
+      fullName(t.staff),
+      fullName(t.client),
       t.shift_date,
       t.start_time ? extractPerthTime(t.start_time) : "",
       t.end_time ? extractPerthTime(t.end_time) : "",
@@ -92,10 +93,10 @@ export default function Timesheets() {
                       className="border-b last:border-0 hover:bg-secondary/30 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3 font-medium text-card-foreground">
-                        {t.staff ? `${t.staff.first_name} ${t.staff.last_name}` : "—"}
+                        {fullName(t.staff)}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {t.client ? `${t.client.first_name} ${t.client.last_name}` : "—"}
+                        {fullName(t.client)}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
                         {formatPerthDate(t.shift_date)}
