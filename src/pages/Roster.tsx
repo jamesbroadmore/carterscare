@@ -9,6 +9,7 @@ import { NewRosterDialog } from "@/components/roster/NewRosterDialog";
 import { EditShiftDialog } from "@/components/roster/EditShiftDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { extractPerthHour, formatPerthTime, getPerthDate } from "@/lib/perth-time";
+import { shortName, fullName } from "@/lib/display-names";
 
 const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const hours = Array.from({ length: 14 }, (_, i) => i + 6);
@@ -32,7 +33,7 @@ export default function Roster() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("timesheets")
-        .select("*, staff:staff_id(first_name, last_name), client:client_id(first_name, last_name)")
+        .select("*, staff:staff_id(first_name, last_name, preferred_name), client:client_id(first_name, last_name, preferred_name)")
         .gte("shift_date", format(currentWeekStart, "yyyy-MM-dd"))
         .lte("shift_date", format(currentWeekEnd, "yyyy-MM-dd"))
         .order("start_time");
@@ -46,7 +47,7 @@ export default function Roster() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("staff")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, preferred_name")
         .eq("status", "active")
         .order("first_name");
       if (error) throw error;
@@ -59,7 +60,7 @@ export default function Roster() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, preferred_name")
         .eq("status", "active")
         .order("first_name");
       if (error) throw error;
@@ -73,7 +74,6 @@ export default function Roster() {
     setRosterDialog({ date, hour });
   };
 
-  // Map timesheets to grid positions using Perth timezone
   const shiftsByCell = useMemo(() => {
     const map: Record<string, typeof timesheets> = {};
     timesheets.forEach((t) => {
@@ -124,7 +124,6 @@ export default function Roster() {
           ) : (
             <div className="overflow-x-auto">
               <div className="min-w-[700px]">
-                {/* Header */}
                 <div className="grid grid-cols-8 border-b">
                   <div className="px-3 py-2 text-xs text-muted-foreground font-medium">Time</div>
                   {daysOfWeek.map((d, i) => (
@@ -134,7 +133,6 @@ export default function Roster() {
                     </div>
                   ))}
                 </div>
-                {/* Grid */}
                 <div className="relative">
                   {hours.map((h) => (
                     <div key={h} className="grid grid-cols-8 border-b last:border-0">
@@ -160,11 +158,11 @@ export default function Roster() {
                                 }}
                               >
                                 <p className="font-semibold text-primary truncate">
-                                  {s.staff?.first_name} {s.staff?.last_name?.[0]}.
+                                  {shortName(s.staff)}
                                 </p>
                                 {s.client && (
                                   <p className="text-muted-foreground truncate">
-                                    → {s.client.first_name} {s.client.last_name?.[0]}.
+                                    → {shortName(s.client)}
                                   </p>
                                 )}
                                 <p className="text-muted-foreground/60">

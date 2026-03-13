@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { fullName } from "@/lib/display-names";
 
 const typeIcons: Record<string, any> = {
   medication_error: Pill,
@@ -32,7 +33,7 @@ export default function Incidents() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("incidents")
-        .select("*, reporter:reported_by(first_name, last_name), client:client_id(first_name, last_name)")
+        .select("*, reporter:reported_by(first_name, last_name, preferred_name), client:client_id(first_name, last_name, preferred_name)")
         .order("incident_date", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -81,8 +82,7 @@ export default function Incidents() {
                         <div>
                           <p className="text-sm font-semibold text-card-foreground capitalize">{inc.incident_type.replace("_", " ")}</p>
                           <p className="text-xs text-muted-foreground">
-                            {inc.client ? `${inc.client.first_name} ${inc.client.last_name}` : "N/A"} ·{" "}
-                            {inc.reporter ? `${inc.reporter.first_name} ${inc.reporter.last_name}` : "N/A"} ·{" "}
+                            {fullName(inc.client)} · Reported by {fullName(inc.reporter)} ·{" "}
                             {format(new Date(inc.incident_date), "MMM d, yyyy")}
                           </p>
                         </div>
@@ -127,7 +127,7 @@ function AddIncidentDialog({ onClose }: { onClose: () => void }) {
   const { data: clientList = [] } = useQuery({
     queryKey: ["client-list-incidents"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clients").select("id, first_name, last_name").eq("status", "active").order("first_name");
+      const { data, error } = await supabase.from("clients").select("id, first_name, last_name, preferred_name").eq("status", "active").order("first_name");
       if (error) throw error;
       return data;
     },
@@ -203,7 +203,11 @@ function AddIncidentDialog({ onClose }: { onClose: () => void }) {
             <select value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })}
               className="w-full h-9 rounded-lg border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">Select client (optional)...</option>
-              {clientList.map((c: any) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
+              {clientList.map((c: any) => (
+                <option key={c.id} value={c.id}>
+                  {c.preferred_name ? `${c.preferred_name} ${c.last_name}` : `${c.first_name} ${c.last_name}`}
+                </option>
+              ))}
             </select>
           </div>
           <div>

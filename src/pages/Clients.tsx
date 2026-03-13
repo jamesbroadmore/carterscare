@@ -8,6 +8,7 @@ import { AddClientDialog } from "@/components/AddClientDialog";
 import { EditClientDialog } from "@/components/EditClientDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { fullName } from "@/lib/display-names";
 
 const TABS = [
   { key: "all", label: "All Clients" },
@@ -46,14 +47,14 @@ export default function Clients() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_staff_assignments")
-        .select("client_id, staff_id, staff:staff_id(id, first_name, last_name)");
+        .select("client_id, staff_id, staff:staff_id(id, first_name, last_name, preferred_name)");
       if (error) throw error;
       return data;
     },
   });
 
   const assignmentsByClient = useMemo(() => {
-    const map: Record<string, { id: string; first_name: string; last_name: string }[]> = {};
+    const map: Record<string, any[]> = {};
     assignments.forEach((a: any) => {
       if (!map[a.client_id]) map[a.client_id] = [];
       if (a.staff) map[a.client_id].push(a.staff);
@@ -75,7 +76,7 @@ export default function Clients() {
   });
 
   const handleDelete = (client: any) => {
-    if (confirm(`Are you sure you want to delete ${client.first_name} ${client.last_name}?`)) {
+    if (confirm(`Are you sure you want to delete ${fullName(client)}?`)) {
       deleteMutation.mutate(client.id);
     }
     setMenuOpen(null);
@@ -83,16 +84,14 @@ export default function Clients() {
 
   const filtered = useMemo(() => {
     let list = clientsData;
-    if (activeTab !== "all") {
-      list = list.filter((c) => getFundingCategory(c.funding_type) === activeTab);
-    }
+    if (activeTab !== "all") list = list.filter((c) => getFundingCategory(c.funding_type) === activeTab);
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter(
-        (c) =>
-          c.first_name.toLowerCase().includes(q) ||
-          c.last_name.toLowerCase().includes(q) ||
-          (c.ndis_number && c.ndis_number.toLowerCase().includes(q))
+      list = list.filter((c) =>
+        c.first_name.toLowerCase().includes(q) ||
+        c.last_name.toLowerCase().includes(q) ||
+        (c.preferred_name && c.preferred_name.toLowerCase().includes(q)) ||
+        (c.ndis_number && c.ndis_number.toLowerCase().includes(q))
       );
     }
     return list;
@@ -100,32 +99,20 @@ export default function Clients() {
 
   const counts = useMemo(() => {
     const c = { all: clientsData.length, ndis: 0, aged_care: 0, other: 0 };
-    clientsData.forEach((cl) => {
-      const cat = getFundingCategory(cl.funding_type);
-      c[cat as keyof typeof c]++;
-    });
+    clientsData.forEach((cl) => { c[getFundingCategory(cl.funding_type) as keyof typeof c]++; });
     return c;
   }, [clientsData]);
 
   return (
     <AppLayout title="Client Management">
       <div className="space-y-4">
-        {/* Tabs */}
         <div className="flex flex-wrap gap-1 rounded-lg bg-secondary/50 p-1 w-fit">
           {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                activeTab === tab.key
-                  ? "bg-card text-card-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              <span className="ml-1.5 text-[10px] opacity-60">
-                {counts[tab.key as keyof typeof counts]}
-              </span>
+                activeTab === tab.key ? "bg-card text-card-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}>
+              {tab.label}<span className="ml-1.5 text-[10px] opacity-60">{counts[tab.key as keyof typeof counts]}</span>
             </button>
           ))}
         </div>
@@ -133,12 +120,9 @@ export default function Clients() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+            <input value={search} onChange={(e) => setSearch(e.target.value)}
               className="w-full h-9 pl-9 pr-3 rounded-lg border bg-card text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder="Search clients..."
-            />
+              placeholder="Search clients..." />
           </div>
           {isAdmin && (
             <button onClick={() => setShowAdd(true)} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-opacity">
@@ -155,9 +139,7 @@ export default function Clients() {
         ) : filtered.length === 0 ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-xl bg-card p-12 shadow-card border border-border/50 text-center">
             <p className="text-muted-foreground text-sm">
-              {clientsData.length === 0
-                ? 'No clients yet. Click "Add Client" to get started.'
-                : "No clients match your filters."}
+              {clientsData.length === 0 ? 'No clients yet. Click "Add Client" to get started.' : "No clients match your filters."}
             </p>
           </motion.div>
         ) : (
@@ -165,56 +147,44 @@ export default function Clients() {
             {filtered.map((c, i) => {
               const category = getFundingCategory(c.funding_type);
               return (
-                <motion.div
-                  key={c.id}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                  className="rounded-xl bg-card p-5 shadow-card border border-border/50"
-                >
+                <motion.div key={c.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                  className="rounded-xl bg-card p-5 shadow-card border border-border/50">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-card-foreground">{c.first_name} {c.last_name}</h3>
+                        <h3 className="text-sm font-semibold text-card-foreground">{fullName(c)}</h3>
                         <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded-full ${
-                          category === "ndis"
-                            ? "bg-primary/10 text-primary"
-                            : category === "aged_care"
-                            ? "bg-accent/50 text-accent-foreground"
-                            : "bg-muted text-muted-foreground"
+                          category === "ndis" ? "bg-primary/10 text-primary" :
+                          category === "aged_care" ? "bg-accent/50 text-accent-foreground" :
+                          "bg-muted text-muted-foreground"
                         }`}>
                           {category === "ndis" ? "NDIS" : category === "aged_care" ? "Aged Care" : "Other"}
                         </span>
                       </div>
-                      {(c as any).preferred_name && <p className="text-xs text-muted-foreground mt-0.5">"{(c as any).preferred_name}"</p>}
+                      {c.preferred_name && c.preferred_name !== c.first_name && (
+                        <p className="text-xs text-muted-foreground mt-0.5">Legal: {c.first_name} {c.last_name}</p>
+                      )}
                       {c.ndis_number && <p className="text-xs text-muted-foreground mt-0.5">NDIS: {c.ndis_number}</p>}
                     </div>
                     {isAdmin && (
-                      <ClientActionMenu
-                        open={menuOpen === c.id}
-                        onToggle={() => setMenuOpen(menuOpen === c.id ? null : c.id)}
-                        onClose={() => setMenuOpen(null)}
-                        onEdit={() => { setEditClient(c); setMenuOpen(null); }}
-                        onDelete={() => handleDelete(c)}
-                      />
+                      <ClientActionMenu open={menuOpen === c.id} onToggle={() => setMenuOpen(menuOpen === c.id ? null : c.id)}
+                        onClose={() => setMenuOpen(null)} onEdit={() => { setEditClient(c); setMenuOpen(null); }}
+                        onDelete={() => handleDelete(c)} />
                     )}
                   </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="text-card-foreground font-medium capitalize">{c.status}</span></div>
                     {c.funding_type && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Funding</span>
-                        <span className="text-card-foreground font-medium capitalize">{c.funding_type.replace("_", " ")}</span>
-                      </div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="text-card-foreground font-medium capitalize">{c.funding_type.replace("_", " ")}</span></div>
                     )}
                     {c.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="text-card-foreground font-medium">{c.phone}</span></div>}
                     {assignmentsByClient[c.id] && assignmentsByClient[c.id].length > 0 && (
                       <div className="pt-1">
                         <span className="text-muted-foreground">Assigned Staff</span>
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {assignmentsByClient[c.id].map((s) => (
+                          {assignmentsByClient[c.id].map((s: any) => (
                             <span key={s.id} className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
-                              {s.first_name} {s.last_name}
+                              {fullName(s)}
                             </span>
                           ))}
                         </div>
@@ -235,36 +205,27 @@ function ClientActionMenu({ open, onToggle, onClose, onEdit, onDelete }: {
   open: boolean; onToggle: () => void; onClose: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open, onClose]);
 
   return (
     <div ref={ref} className="relative">
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggle(); }}
-        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-      >
+      <button onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
         <MoreHorizontal className="h-4 w-4" />
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 w-36 rounded-lg bg-popover border border-border shadow-lg py-1">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-popover-foreground hover:bg-secondary transition-colors"
-          >
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-popover-foreground hover:bg-secondary transition-colors">
             <Pencil className="h-3.5 w-3.5" /> Edit
           </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-          >
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors">
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </button>
         </div>

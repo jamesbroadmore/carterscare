@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { perthToISO } from "@/lib/perth-time";
+import { fullName } from "@/lib/display-names";
 
 interface ShiftEntry {
   id: string;
@@ -21,8 +22,8 @@ interface NewRosterDialogProps {
   onClose: () => void;
   defaultDate: string;
   defaultHour: number;
-  staffList: { id: string; first_name: string; last_name: string }[];
-  clientList: { id: string; first_name: string; last_name: string }[];
+  staffList: { id: string; first_name: string; last_name: string; preferred_name?: string | null }[];
+  clientList: { id: string; first_name: string; last_name: string; preferred_name?: string | null }[];
 }
 
 const createEntry = (date: string, hour: number): ShiftEntry => ({
@@ -39,11 +40,8 @@ export function NewRosterDialog({ open, onClose, defaultDate, defaultHour, staff
   const queryClient = useQueryClient();
   const [entries, setEntries] = useState<ShiftEntry[]>([createEntry(defaultDate, defaultHour)]);
 
-  // Reset entries when dialog opens with new defaults
   useEffect(() => {
-    if (open) {
-      setEntries([createEntry(defaultDate, defaultHour)]);
-    }
+    if (open) setEntries([createEntry(defaultDate, defaultHour)]);
   }, [open, defaultDate, defaultHour]);
 
   const mutation = useMutation({
@@ -73,21 +71,12 @@ export function NewRosterDialog({ open, onClose, defaultDate, defaultHour, staff
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   };
 
-  const removeEntry = (id: string) => {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-  };
-
-  const duplicateEntry = (entry: ShiftEntry) => {
-    setEntries((prev) => [...prev, { ...entry, id: crypto.randomUUID() }]);
-  };
+  const removeEntry = (id: string) => setEntries((prev) => prev.filter((e) => e.id !== id));
+  const duplicateEntry = (entry: ShiftEntry) => setEntries((prev) => [...prev, { ...entry, id: crypto.randomUUID() }]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const missing = entries.some((s) => !s.staffId);
-    if (missing) {
-      toast.error("Every shift must have a staff member assigned");
-      return;
-    }
+    if (entries.some((s) => !s.staffId)) { toast.error("Every shift must have a staff member assigned"); return; }
     mutation.mutate(entries);
   };
 
@@ -95,12 +84,9 @@ export function NewRosterDialog({ open, onClose, defaultDate, defaultHour, staff
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl bg-card shadow-xl border border-border"
-        onClick={(e) => e.stopPropagation()}
-      >
+        onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b shrink-0">
           <div>
             <h2 className="text-lg font-semibold text-card-foreground">
@@ -153,7 +139,7 @@ export function NewRosterDialog({ open, onClose, defaultDate, defaultHour, staff
                     <select value={entry.staffId} onChange={(e) => updateEntry(entry.id, { staffId: e.target.value })}
                       className="w-full h-8 rounded-md border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                       <option value="">Select staff...</option>
-                      {staffList.map((s) => <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>)}
+                      {staffList.map((s) => <option key={s.id} value={s.id}>{fullName(s)}</option>)}
                     </select>
                   </div>
                   <div>
@@ -161,7 +147,7 @@ export function NewRosterDialog({ open, onClose, defaultDate, defaultHour, staff
                     <select value={entry.clientId} onChange={(e) => updateEntry(entry.id, { clientId: e.target.value })}
                       className="w-full h-8 rounded-md border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                       <option value="">Optional...</option>
-                      {clientList.map((c) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
+                      {clientList.map((c) => <option key={c.id} value={c.id}>{fullName(c)}</option>)}
                     </select>
                   </div>
                 </div>
@@ -175,19 +161,14 @@ export function NewRosterDialog({ open, onClose, defaultDate, defaultHour, staff
               </div>
             ))}
 
-            <button
-              type="button"
-              onClick={() => setEntries((prev) => [...prev, createEntry(defaultDate, defaultHour)])}
-              className="w-full h-9 rounded-lg border border-dashed border-border text-sm font-medium text-muted-foreground flex items-center justify-center gap-2 hover:bg-secondary hover:text-foreground transition-colors"
-            >
+            <button type="button" onClick={() => setEntries((prev) => [...prev, createEntry(defaultDate, defaultHour)])}
+              className="w-full h-9 rounded-lg border border-dashed border-border text-sm font-medium text-muted-foreground flex items-center justify-center gap-2 hover:bg-secondary hover:text-foreground transition-colors">
               <Plus className="h-4 w-4" /> Add Another Shift
             </button>
           </div>
 
           <div className="flex justify-end gap-2 p-5 border-t shrink-0">
-            <button type="button" onClick={onClose} className="h-9 px-4 rounded-lg border text-sm font-medium text-foreground hover:bg-secondary transition-colors">
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="h-9 px-4 rounded-lg border text-sm font-medium text-foreground hover:bg-secondary transition-colors">Cancel</button>
             <button type="submit" disabled={mutation.isPending} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50">
               {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Create {entries.length > 1 ? `${entries.length} Shifts` : "Shift"}
