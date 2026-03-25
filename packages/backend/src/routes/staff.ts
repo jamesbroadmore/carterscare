@@ -1,135 +1,149 @@
-import { Router, Request, Response } from "express";
-import { v4 as uuidv4 } from "uuid";
-import { getDatabase } from "../config/database.js";
-import {
-  createSuccessResponse,
-  ErrorCodes,
-  AppError,
-  Staff,
-  CreateStaffRequest,
-} from "@shared/types";
+/**
+ * Staff management routes with full CRUD operations.
+ * All endpoints use the staff service layer for database operations.
+ */
+
+import { Router, type Request, type Response, type NextFunction } from 'express';
+import { staffService } from '@/services/index.js';
+import { logger } from '@/utils/logger.js';
+import { validateBody, validateQuery, paginationSchema, calculatePagination } from '@/utils/validation.js';
+import { AppError } from '@/utils/error-handler.js';
+import { z } from 'zod';
+import type { Staff, ApiResponse } from '@shared/types';
 
 const router = Router();
 
+// Validation schemas
+const createStaffSchema = z.object({
+  firstName: z.string().min(1, 'First name required').max(100),
+  lastName: z.string().min(1, 'Last name required').max(100),
+  email: z.string().email('Invalid email format'),
+  phone: z.string().optional(),
+  preferredName: z.string().optional(),
+  abn: z.string().optional(),
+});
+
+const updateStaffSchema = createStaffSchema.partial();
+
 /**
- * Create a staff member
+ * GET /api/staff
+ * Retrieve all staff members with pagination
  */
-router.post("/", async (req: Request<unknown, unknown, CreateStaffRequest>, res: Response) => {
-  const { firstName, lastName, email, phone, preferredName, abn } = req.body;
-
-  if (!firstName || !lastName || !email) {
-    throw new AppError(
-      ErrorCodes.VALIDATION_ERROR,
-      "firstName, lastName, and email are required",
-      400
-    );
-  }
-
-  const db = getDatabase();
-
-  // Check for duplicate email
-  const existing = await db.collection("staff").findOne({ email });
-  if (existing) {
-    throw new AppError(ErrorCodes.DUPLICATE_ENTRY, "Email already in use", 409);
-  }
-
-  const staff: Staff = {
-    id: uuidv4(),
-    firstName,
-    lastName,
-    preferredName,
-    email,
-    phone,
-    abn,
-    status: "active",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
+router.get('/', validateQuery(paginationSchema), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    await db.collection("staff").insertOne(staff as any);
-    res.status(201).json(createSuccessResponse(staff));
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const { skip, take } = calculatePagination(page, limit);
+
+    logger.debug('Fetching staff members', { page, limit });
+
+    const staff = await staffService.getAllStaff(skip, take);
+    const total = await staffService.countStaff();
+
+    const response: ApiResponse<Staff[]> = {
+      success: true,
+      data: staff,
+      meta: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+
+    res.json(response);
   } catch (error) {
-    console.error("[v0] Error creating staff:", error);
-    throw new AppError(ErrorCodes.INTERNAL_ERROR, "Failed to create staff member", 500);
+    next(error);
   }
 });
 
 /**
- * Get all staff
+ * GET /api/staff/:id
+ * Retrieve a specific staff member by ID
  */
-router.get("/", async (_req: Request, res: Response) => {
-  const db = getDatabase();
-
+router.get('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const staff = await db
-      .collection("staff")
-      .find({ status: "active" })
-      .sort({ createdAt: -1 })
-      .toArray();
+    const { id } = req.params;
+    logger.debug('Fetching staff member', { id });
 
-    res.json(createSuccessResponse(staff));
+    const staff = await staffService.getStaffById(id);
+
+    const response: ApiResponse<Staff> = {
+      success: true,
+      data: staff,
+    };
+
+    res.json(response);
   } catch (error) {
-    console.error("[v0] Error fetching staff:", error);
-    throw new AppError(ErrorCodes.INTERNAL_ERROR, "Failed to fetch staff", 500);
+    next(error);
   }
 });
 
 /**
- * Get a specific staff member
+ * POST /api/staff
+ * Create a new staff member
  */
-router.get("/:id", async (req: Request<{ id: string }>, res: Response) => {
-  const db = getDatabase();
-  const { id } = req.params;
-
+router.post('/', validateBody(createStaffSchema), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const staff = await db.collection("staff").findOne({ id });
+    const input = req.body;
+    logger.info('Creating staff member', { email: input.email });
 
-    if (!staff) {
-      throw new AppError(ErrorCodes.NOT_FOUND, "Staff member not found", 404);
-    }
+    const staff = await staffService.createStaff(input);
 
-    res.json(createSuccessResponse(staff));
+    const response: ApiResponse<Staff> = {
+      success: true,
+      data: staff,
+    };
+
+    res.status(201).json(response);
   } catch (error) {
-    if (error instanceof AppError) throw error;
-    console.error("[v0] Error fetching staff:", error);
-    throw new AppError(ErrorCodes.INTERNAL_ERROR, "Failed to fetch staff", 500);
+    next(error);
   }
 });
 
 /**
+ * PATCH /api/staff/:id
  * Update a staff member
  */
-router.patch("/:id", async (req: Request<{ id: string }, unknown, Partial<CreateStaffRequest>>, res: Response) => {
-  const db = getDatabase();
-  const { id } = req.params;
-  const updates = req.body;
-
-  if (Object.keys(updates).length === 0) {
-    throw new AppError(ErrorCodes.VALIDATION_ERROR, "No updates provided", 400);
-  }
-
+router.patch('/:id', validateBody(updateStaffSchema), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const result = await db.collection("staff").findOneAndUpdate(
-      { id },
-      {
-        $set: {
-          ...updates,
-          updatedAt: new Date().toISOString(),
-        },
-      },
-      { returnDocument: "after" }
-    );
+    const { id } = req.params;
+    const updates = req.body;
 
-    if (!result.value) {
-      throw new AppError(ErrorCodes.NOT_FOUND, "Staff member not found", 404);
-    }
+    logger.info('Updating staff member', { id });
 
-    res.json(createSuccessResponse(result.value));
+    const staff = await staffService.updateStaff(id, updates);
+
+    const response: ApiResponse<Staff> = {
+      success: true,
+      data: staff,
+    };
+
+    res.json(response);
   } catch (error) {
-    if (error instanceof AppError) throw error;
-    console.error("[v0] Error updating staff:", error);
-    throw new AppError(ErrorCodes.INTERNAL_ERROR, "Failed to update staff", 500);
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/staff/:id
+ * Delete a staff member
+ */
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    logger.info('Deleting staff member', { id });
+
+    await staffService.deleteStaff(id);
+
+    const response: ApiResponse<null> = {
+      success: true,
+      data: null,
+    };
+
+    res.json(response);
+  } catch (error) {
+    next(error);
   }
 });
 

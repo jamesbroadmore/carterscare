@@ -1,125 +1,148 @@
-import { Router, Request, Response } from "express";
-import { v4 as uuidv4 } from "uuid";
-import { getDatabase } from "../config/database.js";
-import {
-  createSuccessResponse,
-  ErrorCodes,
-  AppError,
-  Client,
-  CreateClientRequest,
-} from "@shared/types";
+/**
+ * Client management routes with full CRUD operations.
+ * All endpoints use the client service layer for database operations.
+ */
+
+import { Router, type Request, type Response, type NextFunction } from 'express';
+import { clientService } from '@/services/index.js';
+import { logger } from '@/utils/logger.js';
+import { validateBody, validateQuery, paginationSchema, calculatePagination } from '@/utils/validation.js';
+import { z } from 'zod';
+import type { Client, ApiResponse } from '@shared/types';
 
 const router = Router();
 
+// Validation schemas
+const createClientSchema = z.object({
+  firstName: z.string().min(1, 'First name required').max(100),
+  lastName: z.string().min(1, 'Last name required').max(100),
+  dateOfBirth: z.string().datetime().optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  emergencyContact: z.string().optional(),
+});
+
+const updateClientSchema = createClientSchema.partial();
+
 /**
- * Create a client
+ * GET /api/clients
+ * Retrieve all clients with pagination
  */
-router.post("/", async (req: Request<unknown, unknown, CreateClientRequest>, res: Response) => {
-  const { firstName, lastName, dateOfBirth, address, phone, emergencyContact } = req.body;
-
-  if (!firstName || !lastName) {
-    throw new AppError(ErrorCodes.VALIDATION_ERROR, "firstName and lastName are required", 400);
-  }
-
-  const db = getDatabase();
-
-  const client: Client = {
-    id: uuidv4(),
-    firstName,
-    lastName,
-    dateOfBirth,
-    address,
-    phone,
-    emergencyContact,
-    status: "active",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
+router.get('/', validateQuery(paginationSchema), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    await db.collection("clients").insertOne(client as any);
-    res.status(201).json(createSuccessResponse(client));
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const { skip, take } = calculatePagination(page, limit);
+
+    logger.debug('Fetching clients', { page, limit });
+
+    const clients = await clientService.getAllClients(skip, take);
+    const total = await clientService.countClients();
+
+    const response: ApiResponse<Client[]> = {
+      success: true,
+      data: clients,
+      meta: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+
+    res.json(response);
   } catch (error) {
-    console.error("[v0] Error creating client:", error);
-    throw new AppError(ErrorCodes.INTERNAL_ERROR, "Failed to create client", 500);
+    next(error);
   }
 });
 
 /**
- * Get all clients
+ * GET /api/clients/:id
+ * Retrieve a specific client by ID
  */
-router.get("/", async (_req: Request, res: Response) => {
-  const db = getDatabase();
-
+router.get('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const clients = await db
-      .collection("clients")
-      .find({ status: "active" })
-      .sort({ createdAt: -1 })
-      .toArray();
+    const { id } = req.params;
+    logger.debug('Fetching client', { id });
 
-    res.json(createSuccessResponse(clients));
+    const client = await clientService.getClientById(id);
+
+    const response: ApiResponse<Client> = {
+      success: true,
+      data: client,
+    };
+
+    res.json(response);
   } catch (error) {
-    console.error("[v0] Error fetching clients:", error);
-    throw new AppError(ErrorCodes.INTERNAL_ERROR, "Failed to fetch clients", 500);
+    next(error);
   }
 });
 
 /**
- * Get a specific client
+ * POST /api/clients
+ * Create a new client
  */
-router.get("/:id", async (req: Request<{ id: string }>, res: Response) => {
-  const db = getDatabase();
-  const { id } = req.params;
-
+router.post('/', validateBody(createClientSchema), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const client = await db.collection("clients").findOne({ id });
+    const input = req.body;
+    logger.info('Creating client', { firstName: input.firstName, lastName: input.lastName });
 
-    if (!client) {
-      throw new AppError(ErrorCodes.NOT_FOUND, "Client not found", 404);
-    }
+    const client = await clientService.createClient(input);
 
-    res.json(createSuccessResponse(client));
+    const response: ApiResponse<Client> = {
+      success: true,
+      data: client,
+    };
+
+    res.status(201).json(response);
   } catch (error) {
-    if (error instanceof AppError) throw error;
-    console.error("[v0] Error fetching client:", error);
-    throw new AppError(ErrorCodes.INTERNAL_ERROR, "Failed to fetch client", 500);
+    next(error);
   }
 });
 
 /**
+ * PATCH /api/clients/:id
  * Update a client
  */
-router.patch("/:id", async (req: Request<{ id: string }, unknown, Partial<CreateClientRequest>>, res: Response) => {
-  const db = getDatabase();
-  const { id } = req.params;
-  const updates = req.body;
-
-  if (Object.keys(updates).length === 0) {
-    throw new AppError(ErrorCodes.VALIDATION_ERROR, "No updates provided", 400);
-  }
-
+router.patch('/:id', validateBody(updateClientSchema), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const result = await db.collection("clients").findOneAndUpdate(
-      { id },
-      {
-        $set: {
-          ...updates,
-          updatedAt: new Date().toISOString(),
-        },
-      },
-      { returnDocument: "after" }
-    );
+    const { id } = req.params;
+    const updates = req.body;
 
-    if (!result.value) {
-      throw new AppError(ErrorCodes.NOT_FOUND, "Client not found", 404);
-    }
+    logger.info('Updating client', { id });
 
-    res.json(createSuccessResponse(result.value));
+    const client = await clientService.updateClient(id, updates);
+
+    const response: ApiResponse<Client> = {
+      success: true,
+      data: client,
+    };
+
+    res.json(response);
   } catch (error) {
-    if (error instanceof AppError) throw error;
-    console.error("[v0] Error updating client:", error);
-    throw new AppError(ErrorCodes.INTERNAL_ERROR, "Failed to update client", 500);
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/clients/:id
+ * Delete a client
+ */
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    logger.info('Deleting client', { id });
+
+    await clientService.deleteClient(id);
+
+    const response: ApiResponse<null> = {
+      success: true,
+      data: null,
+    };
+
+    res.json(response);
+  } catch (error) {
+    next(error);
   }
 });
 
