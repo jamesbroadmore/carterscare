@@ -1,0 +1,37 @@
+{
+  "name": "carter-s-care-platform",
+  "version": "1.0.0",
+  "description": "Professional care worker management platform",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "backend": "pnpm -F backend dev",
+    "frontend": "pnpm -F frontend dev",
+    "start:backend": "pnpm -F backend start",
+    "start:frontend": "pnpm -F frontend preview"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "@shared/types": "^1.0.0",
+    "@vitejs/plugin-react-swc": "^4.3.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^4.22.1",
+    "express-async-errors": "^3.1.1",
+    "lovable-tagger": "^1.1.13",
+    "mongodb": "^7.1.1",
+    "uuid": "^13.0.0",
+    "vite": "^8.0.2",
+    "zod": "^4.3.6"
+  }
+}
