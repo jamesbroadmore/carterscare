@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/staff-chat`;
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || import.meta.env.VITE_SUPABASE_URL + '/functions/v1'}/staff-chat`;
 
 const SUGGESTIONS = [
   "How do I report an incident?",
